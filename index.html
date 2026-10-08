@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ChapterLens — Readability</title>
+<style>
+:root{--bg:#0b0d10;--panel:#12161b;--line:#242a32;--text:#f3f5f7;--muted:#9aa3ad;--accent:#8df0c0;--hard:#ff8f8f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}
+main{max-width:1120px;margin:auto;padding:42px 22px 70px}.top{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:28px}
+h1{font-size:42px;line-height:1;margin:0 0 10px;letter-spacing:-1.5px}.sub{color:var(--muted);max-width:650px;line-height:1.55}
+button{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;background:var(--accent);color:#07120d}
+button.secondary{background:#1a2027;color:var(--text);border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+textarea{width:100%;height:390px;resize:vertical;background:#0d1014;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:18px;font:16px/1.65 Georgia,serif;outline:none}
+textarea:focus{border-color:#4d7e68}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}.metric{padding:15px;background:#0d1014;border:1px solid var(--line);border-radius:12px}.metric b{display:block;font-size:25px;margin-top:4px}.label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.score{display:flex;align-items:center;gap:14px;margin-bottom:18px}.score-num{font-size:54px;font-weight:800;letter-spacing:-2px}.pill{padding:6px 10px;border-radius:999px;background:#183025;color:var(--accent);font-weight:700}
+h2{font-size:16px;margin:22px 0 10px}.hard{padding:13px 14px;margin:9px 0;background:#191417;border-left:3px solid var(--hard);border-radius:8px;line-height:1.5;font-family:Georgia,serif}.empty{color:var(--muted);line-height:1.5}
+.highlight{font-family:Georgia,serif;line-height:1.8;color:#dfe4e8}.highlight span{padding:2px 3px;border-radius:4px}.highlight .hardest{background:rgba(255,143,143,.22);box-shadow:0 0 0 1px rgba(255,143,143,.25)}
+footer{margin-top:16px;color:var(--muted);font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.top{align-items:start;flex-direction:column}h1{font-size:35px}}
+</style>
+</head>
+<body>
+<main>
+  <section class="top">
+    <div><h1>ChapterLens</h1><div class="sub">Paste a chapter. Get a readability score, useful stats, and the five sentences most likely to slow a reader down.</div></div>
+    <div class="actions"><button id="analyze">Analyze chapter</button><button class="secondary" id="sample">Load sample</button><button class="secondary" id="clear">Clear</button></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <div class="label">Your chapter</div>
+      <textarea id="text" placeholder="Paste your chapter here…"></textarea>
+      <footer>Runs entirely in your browser. Nothing is uploaded.</footer>
+    </div>
+    <div class="card">
+      <div class="score"><div class="score-num" id="score">—</div><div><div class="label">Flesch Reading Ease</div><div class="pill" id="level">Waiting for text</div></div></div>
+      <div class="metrics">
+        <div class="metric"><span class="label">Words</span><b id="words">0</b></div>
+        <div class="metric"><span class="label">Sentences</span><b id="sentences">0</b></div>
+        <div class="metric"><span class="label">Avg. words</span><b id="avg">0</b></div>
+        <div class="metric"><span class="label">Syllables</span><b id="syllables">0</b></div>
+      </div>
+      <h2>Five hardest sentences</h2>
+      <div id="hardest"><div class="empty">Analyze a chapter to see the five sentences with the lowest estimated readability.</div></div>
+      <h2>Chapter view</h2>
+      <div id="highlight" class="highlight"><span class="empty">Hard sentences will be highlighted here.</span></div>
+    </div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const sample=`The room was quiet, but not peacefully so. Mara had spent the morning sorting through letters that had accumulated in the drawer beside her desk, each envelope carrying a different version of a life she no longer recognized. Although she understood that most of the messages were ordinary, she kept returning to the same paragraph because its careful phrasing suggested that someone had deliberately left something unsaid. By noon, the rain had become heavy enough to blur the windows, and the city beyond them seemed distant and strangely unreal.`;
+
+function words(s){return s.trim().match(/\b[\w’'-]+\b/g)||[]}
+function sentences(s){return (s.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[]).map(x=>x.trim()).filter(Boolean)}
+function syllable(w){
+  w=w.toLowerCase().replace(/[^a-z]/g,''); if(!w)return 0;
+  if(w.length<=3)return 1;
+  w=w.replace(/(?:e$|es$|ed$)/,'');
+  const m=w.match(/[aeiouy]+/g); return Math.max(1,m?m.length:1);
+}
+function flesch(text){
+  const ws=words(text), ss=sentences(text); if(!ws.length||!ss.length)return null;
+  const syl=ws.reduce((a,w)=>a+syllable(w),0);
+  return {score:206.835-1.015*(ws.length/ss.length)-84.6*(syl/ws.length),words:ws.length,sentences:ss.length,syl};
+}
+function sentenceScore(s){
+  const ws=words(s), syl=ws.reduce((a,w)=>a+syllable(w),0);
+  if(!ws.length)return 999;
+  return 206.835-1.015*ws.length-84.6*(syl/ws.length);
+}
+function level(x){return x>=90?'Very easy':x>=80?'Easy':x>=70?'Fairly easy':x>=60?'Standard':x>=50?'Fairly difficult':x>=30?'Difficult':'Very difficult'}
+function analyze(){
+  const t=$('text').value.trim(), r=flesch(t);
+  if(!r){$('score').textContent='—';$('level').textContent='Waiting for text';$('hardest').innerHTML='<div class="empty">Analyze a chapter to see the five sentences with the lowest estimated readability.</div>';return}
+  $('score').textContent=Math.max(0,r.score).toFixed(1);$('level').textContent=level(r.score);
+  $('words').textContent=r.words.toLocaleString();$('sentences').textContent=r.sentences.toLocaleString();
+  $('avg').textContent=(r.words/r.sentences).toFixed(1);$('syllables').textContent=r.syl.toLocaleString();
+  const ss=sentences(t).map((s,i)=>({s,i,score:sentenceScore(s)})).sort((a,b)=>a.score-b.score);
+  $('hardest').innerHTML=ss.slice(0,5).map(x=>`<div class="hard"><b>${Math.max(0,x.score).toFixed(1)}</b> · ${escapeHtml(x.s)}</div>`).join('');
+  const ids=new Set(ss.slice(0,5).map(x=>x.i));
+  $('highlight').innerHTML=sentences(t).map((s,i)=>ids.has(i)?`<span class="hardest">${escapeHtml(s)}</span>`:escapeHtml(s)).join(' ');
+}
+function escapeHtml(x){return x.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+$('analyze').onclick=analyze;$('sample').onclick=()=>{$('text').value=sample;analyze()};$('clear').onclick=()=>{$('text').value='';analyze()};
+$('text').addEventListener('input',()=>{if(!$('text').value.trim())analyze()});
+</script>
+</body></html>
